@@ -18,3 +18,6 @@ blacklist_path = resource_dir + "/" + "blacklist_domains_and_pages"
 
 # Log level
 log_level = logging.DEBUG
+
+# Output the result as pure csv or output a fancy result
+fancy_formatting = False

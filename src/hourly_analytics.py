@@ -18,9 +18,8 @@ file_handler = logging.FileHandler("hourly_analytics.log")
 logger.addHandler(file_handler)
 
 # Configure the logging for requests
-logging.getLogger("requests").setLevel(logging.WARNING)
+logging.getLogger("requests").setLevel(logging.CRITICAL)
 
-# Configure output and resources dirs
 
 def create_dir(dir_path):
     if not (os.path.exists(dir_path)):
@@ -45,7 +44,7 @@ def download_file(url, file_path):
             for chunk in resource_data.iter_content(2048):
                 fd.write(chunk)
     else:
-        logger.info("File {} already present".format(file_path))
+        logger.info("File {} already present, no need to redownload".format(file_path))
 
 
 def get_resource(target_date):
@@ -96,8 +95,8 @@ def hourly_ranking(dates=None):
         # Compute ranking for each given date
         floor_date = datetime.datetime(date.year, date.month, date.day, date.hour, 0) - datetime.timedelta(hours=2 + local_timezone)
 
-        # Define path of the output file
-        output_path = "../output/ranking" + floor_date.strftime("pagecounts-%Y%m%d-%H0000") + ".csv"
+        # Define path of the output files
+        output_path = output_dir + "/ranking-" + floor_date.strftime("%Y%m%d-%H0000") + ".csv"
 
         # Check wether the ranking as already benn computed
         if os.path.isfile(output_path):
@@ -123,13 +122,20 @@ def hourly_ranking(dates=None):
 
             # Filter and write results
             with open(output_path, 'a') as output_fd:
+                # Whether to add the header before each group
+                header = False
+                if not fancy_formatting:
+                    output_fd.write("Original_index Domain Title Count\n")
                 for name, group in table_groups:
                     # Sort
                     group.sort(("count"), ascending=False, inplace=True)
-                    output_fd.write("Domain : " + name + "\n---\n")
+                    if fancy_formatting:
+                        output_fd.write("Domain : " + name + "\n---\n")
+                        header = True
                     # Select first 25
-                    group[:25].to_csv(output_fd)
-                    output_fd.write("----------\n\n")
+                    group[:25].to_csv(output_fd, sep=" ", header=header)
+                    if fancy_formatting:
+                        output_fd.write("----------\n\n")
 
 
 def hourly_analytics(dates=None):
