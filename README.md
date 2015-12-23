@@ -17,3 +17,4 @@ cd src && python3 hourly_analytics.py
 This will run the script with the current date
 
 ## Custom dates
+If you want to call the script for custom dates and hours, call the function `hourly_analytics` of the module of the same name (`hourly_analytics`) and give it a list of Python `datetime`.
