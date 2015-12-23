@@ -4,25 +4,7 @@ import datetime
 import os
 import os.path
 import logging
-
-# Timezone.
-# Please indicate a valid int
-# Ex : For Europe/Paris : 1
-local_timezone = 1
-# Path of the resources dir
-resource_dir = "../resources"
-
-# Path of the output files
-output_dir = "../output"
-
-# URL of the balcklist file
-blacklist_origin = "https://s3.amazonaws.com/dd-interview-data/data_engineer/wikipedia/blacklist_domains_and_pages"
-
-# Path of the blacklist file
-blacklist_path = resource_dir + "/" + "blacklist_domains_and_pages"
-
-# Log level
-log_level = logging.DEBUG
+from config import *
 
 # Configure logging
 logger = logging.getLogger()
@@ -35,6 +17,8 @@ logger.addHandler(stream_handler)
 file_handler = logging.FileHandler("hourly_analytics.log")
 logger.addHandler(file_handler)
 
+# Configure the logging for requests
+logging.getLogger("requests").setLevel(logging.WARNING)
 
 # Configure output and resources dirs
 
@@ -82,6 +66,7 @@ def get_table_from_resource(file_path):
 
 
 def blacklist(table):
+    """Returns the table filtered with the blacklist"""
     # First, download the blacklist file
     download_file(blacklist_origin, blacklist_path)
 
@@ -147,8 +132,13 @@ def hourly_ranking(dates=None):
                     output_fd.write("----------\n\n")
 
 
-if __name__ == "__main__":
+def hourly_analytics(dates=None):
+    """The main function"""
     # Create the directories if necessary
     create_dir(resource_dir)
     create_dir(output_dir)
-    hourly_ranking()
+    hourly_ranking(dates)
+
+
+if __name__ == "__main__":
+    hourly_analytics()
