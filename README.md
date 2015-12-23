@@ -6,3 +6,10 @@ There is no install required for the script itself, but you must install the dep
 ```
 pip install -r requirements.txt
 ```
+
+# Running the script
+Go to `src` and then run (with Python3) the script `hourly_analytics`
+
+```
+cd src && python3 hourly_analytics.py
+```
