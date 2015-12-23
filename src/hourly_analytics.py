@@ -2,6 +2,7 @@ import pandas as pd
 import requests
 import datetime
 import os.path
+import logging
 
 # Timezone
 # Please indicate a valid int
@@ -15,6 +16,19 @@ blacklist_origin = "https://s3.amazonaws.com/dd-interview-data/data_engineer/wik
 # Path of the blacklist file
 blacklist_path = resource_folder + "/" + "blacklist_domains_and_pages"
 
+# Log level
+log_level = logging.DEBUG
+
+# Configure logging
+logger = logging.getLogger()
+logger.setLevel(log_level)
+# Add logging to standard stream
+stream_handler = logging.StreamHandler()
+logger.addHandler(stream_handler)
+# Add logging to file
+file_handler = logging.FileHandler("hourly_analytics.log")
+logger.addHandler(file_handler)
+
 
 def get_resource_name(target_datetime):
     """Returns the name of the resource associated with the given datetime"""
@@ -25,13 +39,13 @@ def download_file(url, file_path):
     """Downloads the file present at the given url and saves it in file_path"""
     if not os.path.isfile(file_path):
         # Download only if necessary
-        print("Downloading the file for the url {}".format(url))
+        logger.info("Downloading the file for the url {}".format(url))
         with open(file_path, "wb") as fd:
             resource_data = requests.get(url, stream=True)
             for chunk in resource_data.iter_content(2048):
                 fd.write(chunk)
     else:
-        print("File {} already present".format(file_path))
+        logger.info("File {} already present".format(file_path))
 
 
 def get_resource(target_date):
@@ -44,7 +58,7 @@ def get_resource(target_date):
 
 def get_table_from_resource(file_path):
     """Imports a resource file as an in-memory Dataframe"""
-    print("Importing the resource into memory")
+    logger.info("Importing the resource into memory")
     return pd.read_table(file_path, sep=' ', names=["domain", "title", "count", "response_time"], usecols=["domain", "title", "count"])
 
 
@@ -84,9 +98,9 @@ def hourly_ranking(dates=None):
         # Check wether the ranking as already benn computed
         if os.path.isfile(output_path):
             # If already present, do noting
-            print("Ranking for this date already present in {}, exiting.".format(output_path))
+            logger.error("Ranking for this date already present in {}, exiting.".format(output_path))
         else:
-            print("Computing the ranking")
+            logger.info("Computing the ranking")
 
             # Get and save the resource file on disk
             get_resource(floor_date)
