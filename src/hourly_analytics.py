@@ -1,20 +1,25 @@
 import pandas as pd
 import requests
 import datetime
+import os
 import os.path
 import logging
 
-# Timezone
+# Timezone.
 # Please indicate a valid int
-timezone_delta = 2
-# Path of the resources folder
-resource_folder = "../resources"
+# Ex : For Europe/Paris : 1
+local_timezone = 1
+# Path of the resources dir
+resource_dir = "../resources"
+
+# Path of the output files
+output_dir = "../output"
 
 # URL of the balcklist file
 blacklist_origin = "https://s3.amazonaws.com/dd-interview-data/data_engineer/wikipedia/blacklist_domains_and_pages"
 
 # Path of the blacklist file
-blacklist_path = resource_folder + "/" + "blacklist_domains_and_pages"
+blacklist_path = resource_dir + "/" + "blacklist_domains_and_pages"
 
 # Log level
 log_level = logging.DEBUG
@@ -22,12 +27,23 @@ log_level = logging.DEBUG
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(log_level)
+formatter = logging.Formatter('%(asctime)s :: %(levelname)s :: %(message)s')
 # Add logging to standard stream
 stream_handler = logging.StreamHandler()
 logger.addHandler(stream_handler)
 # Add logging to file
 file_handler = logging.FileHandler("hourly_analytics.log")
 logger.addHandler(file_handler)
+
+
+# Configure output and resources dirs
+
+def create_dir(dir_path):
+    if not (os.path.exists(dir_path)):
+        # Only create
+        os.makedirs(dir_path)
+    elif not(os.path.isdir(dir_path)):
+        raise Exception("{} already exists, but is not as directory, aborting...".format(dir_path))
 
 
 def get_resource_name(target_datetime):
@@ -51,7 +67,7 @@ def download_file(url, file_path):
 def get_resource(target_date):
     """Downloads the resource corresponding to the given date from the wikimedia archive"""
     # Get the path of the resource file
-    resource_path = resource_folder + "/" + get_resource_name(target_date)
+    resource_path = resource_dir + "/" + get_resource_name(target_date)
     resource_url = "http://dumps.wikimedia.org/other/pagecounts-all-sites/" + target_date.strftime("%Y/%Y-%m/pagecounts-%Y%m%d-%H0000.gz")
     download_file(resource_url, resource_path)
 
@@ -59,7 +75,10 @@ def get_resource(target_date):
 def get_table_from_resource(file_path):
     """Imports a resource file as an in-memory Dataframe"""
     logger.info("Importing the resource into memory")
-    return pd.read_table(file_path, sep=' ', names=["domain", "title", "count", "response_time"], usecols=["domain", "title", "count"])
+    try:
+        return pd.read_table(file_path, sep=' ', names=["domain", "title", "count", "response_time"], usecols=["domain", "title", "count"])
+    except:
+        logger.error("Error during the importation of the resource file {}. Try to remove it and redownload it.".format(file_path))
 
 
 def blacklist(table):
@@ -86,7 +105,7 @@ def hourly_ranking(dates=None):
     """Computes and saves the pageview rankings"""
     if dates is None:
         # If the date is not given, take the last available data
-        dates = [datetime.datetime.now() - datetime.timedelta(hours=2 + timezone_delta)]
+        dates = [datetime.datetime.now() - datetime.timedelta(hours=2 + local_timezone)]
 
     for date in dates:
         # Compute ranking for each given date
@@ -106,7 +125,7 @@ def hourly_ranking(dates=None):
             get_resource(floor_date)
 
             # Get the table as an in-memory object
-            table = get_table_from_resource(resource_folder + "/" + get_resource_name(floor_date))
+            table = get_table_from_resource(resource_dir + "/" + get_resource_name(floor_date))
 
             # Blacklist elements
             table = blacklist(table)
@@ -122,11 +141,14 @@ def hourly_ranking(dates=None):
                 for name, group in table_groups:
                     # Sort
                     group.sort(("count"), ascending=False, inplace=True)
-                    output_fd.write(name + "\n---\n")
+                    output_fd.write("Domain : " + name + "\n---\n")
                     # Select first 25
                     group[:25].to_csv(output_fd)
                     output_fd.write("----------\n\n")
 
 
 if __name__ == "__main__":
+    # Create the directories if necessary
+    create_dir(resource_dir)
+    create_dir(output_dir)
     hourly_ranking()
