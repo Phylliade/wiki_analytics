@@ -105,11 +105,11 @@ def hourly_ranking(dates=None):
     """Computes and saves the pageview rankings"""
     if dates is None:
         # If the date is not given, take the last available data
-        dates = [datetime.datetime.now() - datetime.timedelta(hours=2 + local_timezone)]
+        dates = [datetime.datetime.now()]
 
     for date in dates:
         # Compute ranking for each given date
-        floor_date = datetime.datetime(date.year, date.month, date.day, date.hour, 0)
+        floor_date = datetime.datetime(date.year, date.month, date.day, date.hour, 0) - datetime.timedelta(hours=2 + local_timezone)
 
         # Define path of the output file
         output_path = "../output/ranking" + floor_date.strftime("pagecounts-%Y%m%d-%H0000") + ".csv"
