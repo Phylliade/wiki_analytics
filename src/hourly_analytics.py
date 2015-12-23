@@ -14,7 +14,6 @@ blacklist_origin = "https://s3.amazonaws.com/dd-interview-data/data_engineer/wik
 
 # Path of the blacklist file
 blacklist_path = resource_folder + "/" + "blacklist_domains_and_pages"
-blacklist = pd.read_table(blacklist_path, sep=' ', names=["domain", "title"])
 
 
 def get_resource_name(target_datetime):
@@ -22,28 +21,46 @@ def get_resource_name(target_datetime):
     return target_datetime.strftime("pagecounts-%Y%m%d-%H0000.gz")
 
 
+def download_file(url, file_path):
+    """Downloads the file present at the given url and saves it in file_path"""
+    if not os.path.isfile(file_path):
+        # Download only if necessary
+        print("Downloading the file for the url {}".format(url))
+        with open(file_path, "wb") as fd:
+            resource_data = requests.get(url, stream=True)
+            for chunk in resource_data.iter_content(2048):
+                fd.write(chunk)
+    else:
+        print("File {} already present".format(file_path))
+
+
 def get_resource(target_date):
     """Downloads the resource corresponding to the given date from the wikimedia archive"""
     # Get the path of the resource file
     resource_path = resource_folder + "/" + get_resource_name(target_date)
-
-    if not os.path.isfile(resource_path):
-        # Download only if necessary
-        print("Downloading the resource file for the date : " + str(target_date))
-
-        print(" Getting : http://dumps.wikimedia.org/other/pagecounts-all-sites/" + target_date.strftime("%Y/%Y-%m/pagecounts-%Y%m%d-%H0000.gz"))
-        with open(resource_path, "wb") as resource_fd:
-            resource_data = requests.get("http://dumps.wikimedia.org/other/pagecounts-all-sites/" + target_date.strftime("%Y/%Y-%m/pagecounts-%Y%m%d-%H0000.gz"), stream=True)
-            for chunk in resource_data.iter_content(2048):
-                resource_fd.write(chunk)
-    else:
-        print("Resource file already present")
+    resource_url = "http://dumps.wikimedia.org/other/pagecounts-all-sites/" + target_date.strftime("%Y/%Y-%m/pagecounts-%Y%m%d-%H0000.gz")
+    download_file(resource_url, resource_path)
 
 
 def get_table_from_resource(file_path):
     """Imports a resource file as an in-memory Dataframe"""
     print("Importing the resource into memory")
     return pd.read_table(file_path, sep=' ', names=["domain", "title", "count", "response_time"], usecols=["domain", "title", "count"])
+
+
+def blacklist(table):
+    # First, download the blacklist file
+    download_file(blacklist_origin, blacklist_path)
+
+    # Import the blacklist as a dataframe
+    blacklist = pd.read_table(blacklist_path, sep=' ', names=["domain", "title"])
+
+    # Create and apply the mask
+    blacklist_mask = table[["domain", "title"]].isin(blacklist.to_dict(outtype='list')).all(axis=1)
+    # Remove the blacklist table
+    del(blacklist)
+
+    return table[~blacklist_mask]
 
 
 def split_by_domain(dataframe):
@@ -67,7 +84,7 @@ def hourly_ranking(dates=None):
         # Check wether the ranking as already benn computed
         if os.path.isfile(output_path):
             # If already present, do noting
-            print("Ranking for this date already present in {}, exiting.".format(floor_date))
+            print("Ranking for this date already present in {}, exiting.".format(output_path))
         else:
             print("Computing the ranking")
 
@@ -78,8 +95,7 @@ def hourly_ranking(dates=None):
             table = get_table_from_resource(resource_folder + "/" + get_resource_name(floor_date))
 
             # Blacklist elements
-            blacklist_mask = table[["domain", "title"]].isin(blacklist.to_dict(outtype='list')).all(axis=1)
-            table = table[~blacklist_mask]
+            table = blacklist(table)
 
             # Split elements by domain
             table_groups = split_by_domain(table)
